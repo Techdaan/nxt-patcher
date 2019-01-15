@@ -1,0 +1,16 @@
+plugins {
+    id 'java'
+}
+
+group 'info.techsdev.nxt'
+version '1.0.0'
+
+sourceCompatibility = 1.8
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    compile "com.github.jponge:lzma-java:1.2"
+}
