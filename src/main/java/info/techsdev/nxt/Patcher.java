@@ -65,23 +65,54 @@ public class Patcher {
         byte[] launcherData = Files.readAllBytes(originalLauncher);
         byte[] clientData = Files.readAllBytes(originalClient);
 
+        byte[] oldLauncherRSA = new byte[1024];
+        byte[] oldJS5RSA = new byte[1024];
+        byte[] oldLoginRSA = new byte[256];
+
+        // Find launcher RSA keys
+        int index = indexOf(launcherData, "10001\0".getBytes(Charset.forName("ASCII")));
+        System.arraycopy(launcherData, index - 1028, oldLauncherRSA, 0, oldLauncherRSA.length);
+
+        try {
+            new BigInteger(new String(oldLauncherRSA, Charset.forName("ASCII")), 16);
+        } catch (NumberFormatException e) {
+            throw new IllegalStateException("Couldn't extract launcher RSA key from binary!");
+        }
+
+        // Find client RSA keys
+        index = indexOf(clientData, "10001\0".getBytes(Charset.forName("ASCII")));
+        System.arraycopy(clientData, index + 20, oldJS5RSA, 0, oldJS5RSA.length);
+        System.arraycopy(clientData, index + 20 + oldJS5RSA.length + 16, oldLoginRSA, 0, oldLoginRSA.length);
+
+        try {
+            new BigInteger(new String(oldJS5RSA, Charset.forName("ASCII")), 16);
+        } catch (NumberFormatException e) {
+            throw new IllegalStateException("Couldn't extract JS5 RSA key from binary!");
+        }
+
+
+        try {
+            new BigInteger(new String(oldLoginRSA, Charset.forName("ASCII")), 16);
+        } catch (NumberFormatException e) {
+            throw new IllegalStateException("Couldn't extract login RSA key from binary!");
+        }
 
         // Patch RSA keys
         RSAPrivateKeySpec launcher = generateKeySpec(4096);
         RSAPrivateKeySpec js5 = generateKeySpec(4096);
         RSAPrivateKeySpec login = generateKeySpec(1024);
 
-        if (!patch(launcherData, Settings.LAUNCHER_RSA.getBytes(Charset.forName("ASCII")),
+        if (!patch(launcherData, oldLauncherRSA,
                 launcher.getModulus().toString(16).getBytes(Charset.forName("ASCII")))) {
-            throw new NullPointerException("Couldn't patch launcher RSA key - does the key in the Settings class " +
-                    "match the one in the launcher?");
+            throw new NullPointerException("Couldn't patch launcher RSA key - Did the offset change? Attempting to " +
+                    "replace RSA key: " + new String(oldLauncherRSA, Charset.forName("ASCII")));
         }
-        if (!patch(clientData, Settings.JS5_RSA.getBytes(Charset.forName("ASCII")),
+        if (!patch(clientData, oldJS5RSA,
                 js5.getModulus().toString(16).getBytes(Charset.forName("ASCII")))) {
             throw new NullPointerException("Couldn't patch launcher RSA key - does the key in the Settings class " +
                     "match the one in the launcher?");
         }
-        if (!patch(clientData, Settings.LOGIN_RSA.getBytes(Charset.forName("ASCII")),
+        if (!patch(clientData, oldLoginRSA,
                 login.getModulus().toString(16).getBytes(Charset.forName("ASCII")))) {
             throw new NullPointerException("Couldn't patch launcher RSA key - does the key in the Settings class " +
                     "match the one in the launcher?");
