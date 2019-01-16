@@ -167,8 +167,9 @@ public class Patcher {
                 throw new IllegalArgumentException("Launcher modulus should have a bit length of 4096! Generate new " +
                         "keys by leaving the fields empty.");
 
-            if (Settings.RSAKeys.LAUNCHER.bitLength() != 4095)
-                throw new IllegalArgumentException("Launcher exponent should have a bit length of 4095! Generate new " +
+            // Not sure about the bit length, should probably read up on it
+            if (Settings.RSAKeys.LAUNCHER.bitLength() >= 4090 && Settings.RSAKeys.LAUNCHER.bitLength() <= 4100)
+                throw new IllegalArgumentException("Launcher exponent has an invalid bit length! Generate new " +
                         "keys by leaving the fields empty.");
 
             System.out.println("Using pre-defined launcher keys [exponent]: BigInteger(" + Settings.RSAKeys.LAUNCHER.toString(16) + ")");
@@ -199,8 +200,8 @@ public class Patcher {
 
         // Login key
         if (Settings.RSAKeys.LOGIN != null) {
-            if (Settings.RSAKeys.LOGIN.bitLength() != 4096)
-                throw new IllegalArgumentException("JS5 modulus should have a bit length of 4096! Generate new keys " +
+            if (Settings.RSAKeys.LOGIN.bitLength() != 1024)
+                throw new IllegalArgumentException("Login modulus should have a bit length of 4096! Generate new keys " +
                         "by leaving the field empty.");
 
             System.out.println("Using pre-defined login key: BigInteger(" + Settings.RSAKeys.LOGIN.toString(16) + ")");
