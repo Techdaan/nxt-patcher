@@ -5,10 +5,19 @@ and changes the config URI regex and path based on the settings
 
 # Setup & Usage
 Simply make sure the dependencies from Gradle are present (Currently only lzma-java). After that go to 
-`info.techsdev.nxt.Settings` and edit the settings to your liking. The RSA keys in there must be extracted from the 
-launcher and client manually, this can be done using tools such as IDA pro.
+`info.techsdev.nxt.Settings` and enter your own RSA keys. If you leave fields empty, they will automatically be 
+generated and printed to the console. Leave the launcher keys empty for the first run, those are required for the
+ hash. 
 
-Once the settings are configured simply put the `client.exe` (Your non-patched NXT client) and `launcher.exe` (Your
- non-patched NXT launcher, which can be found at `C:\Program Files\Jagex\RuneScape Launcher`) in a folder named 'library', then run `info.techsdev.nxt.Patcher`
+Once you configured the patcher, put `client.exe` (Your non-patched NXT client) and `launcher.exe` (Your
+ non-patched NXT launcher, which can be found at `C:\Program Files\Jagex\RuneScape Launcher`) in a folder named 
+ 'library', then run `info.techsdev.nxt.Patcher`
 
-Make sure to save the console output for use later on.
+Save the console output when the patcher generates keys for you - you will need them later on. Save the launcher RSA
+keys to prevent having to release a new launcher every client update.
+
+# Errors?
+When encountering an error please let me know by making an issue on Github and I'll take a look as I can
+
+# Contributing
+Please do so if you have anything to contribute! I'll check out pull requests as much as I can.

@@ -97,34 +97,27 @@ public class Patcher {
             throw new IllegalStateException("Couldn't extract login RSA key from binary!");
         }
 
+        // Load RSA keys
+        loadOrGenerateKeys();
+
         // Patch RSA keys
-        RSAPrivateKeySpec launcher = generateKeySpec(4096);
-        RSAPrivateKeySpec js5 = generateKeySpec(4096);
-        RSAPrivateKeySpec login = generateKeySpec(1024);
+
 
         if (!patch(launcherData, oldLauncherRSA,
-                launcher.getModulus().toString(16).getBytes(Charset.forName("ASCII")))) {
+                Settings.RSAKeys.LAUNCHER_MODULUS.toString(16).getBytes(Charset.forName("ASCII")))) {
             throw new NullPointerException("Couldn't patch launcher RSA key - Did the offset change? Attempting to " +
                     "replace RSA key: " + new String(oldLauncherRSA, Charset.forName("ASCII")));
         }
         if (!patch(clientData, oldJS5RSA,
-                js5.getModulus().toString(16).getBytes(Charset.forName("ASCII")))) {
+                Settings.RSAKeys.JS5.toString(16).getBytes(Charset.forName("ASCII")))) {
             throw new NullPointerException("Couldn't patch launcher RSA key - does the key in the Settings class " +
                     "match the one in the launcher?");
         }
         if (!patch(clientData, oldLoginRSA,
-                login.getModulus().toString(16).getBytes(Charset.forName("ASCII")))) {
+                Settings.RSAKeys.LOGIN.toString(16).getBytes(Charset.forName("ASCII")))) {
             throw new NullPointerException("Couldn't patch launcher RSA key - does the key in the Settings class " +
                     "match the one in the launcher?");
         }
-
-        System.out.println("RSA Keys:");
-        System.out.println("public static final BigInteger LAUNCHER_MODULUS = new BigInteger(\"" + launcher.getModulus().toString(16) + "\", 16);");
-        System.out.println("public static final BigInteger LAUNCHER_EXPONENT = new BigInteger(\"" + launcher.getPrivateExponent().toString(16) + "\", 16);\n");
-        System.out.println("public static final BigInteger JS5_MODULUS = new BigInteger(\"" + js5.getModulus().toString(16) + "\", 16);");
-        System.out.println("public static final BigInteger JS5_EXPONENT = new BigInteger(\"" + js5.getPrivateExponent().toString(16) + "\", 16);\n");
-        System.out.println("public static final BigInteger LOGIN_MODULUS = new BigInteger(\"" + login.getModulus().toString(16) + "\", 16);");
-        System.out.println("public static final BigInteger LOGIN_EXPONENT = new BigInteger(\"" + login.getPrivateExponent().toString(16) + "\", 16);\n");
 
         // Patch regex and default config uri
         if (!patch(launcherData, Settings.RUNESCAPE_REGEX.getBytes(Charset.forName("ASCII")),
@@ -145,11 +138,79 @@ public class Patcher {
         Files.write(Settings.BASE_PATH.resolve("client_compressed.exe"), compressedClient);
 
         System.out.println("Client CRC: " + CRC(clientData));
-        System.out.println("Client hash: " + hash(clientData, launcher.getModulus(), launcher.getPrivateExponent()));
+        System.out.println("Client hash: " + hash(clientData, Settings.RSAKeys.LAUNCHER_MODULUS,
+                Settings.RSAKeys.LAUNCHER));
 
-        System.out.println("\nSave this console output to a file to ensure you don't lose this data");
+        System.out.println("\nSave this console output to a file to ensure you don't lose this data. Don't forget to " +
+                "generate new hashes using the generated launcher keys to prevent having to release a new launcher " +
+                "every client update. You can define the keys to use in the 'info.techsdev.nxt.Settings.RSAKeys' " +
+                "class");
         System.out.println("Replace 'download_crc_0' in the client configurations file with the CRC above");
         System.out.println("Replace 'download_hash_0' in the client configurations file with the hash above");
+    }
+
+    /**
+     * Loads the keys from the {@link Settings.RSAKeys} class and applies them. If they do not exist, this method will
+     * generate the RSA keys.
+     */
+    private static void loadOrGenerateKeys() throws NoSuchAlgorithmException, InvalidKeySpecException,
+            InvalidAlgorithmParameterException {
+        System.out.println("Loading/generating keys...");
+
+        // Launcher keys
+        if (Settings.RSAKeys.LAUNCHER != null || Settings.RSAKeys.LAUNCHER_MODULUS != null) {
+            if (Settings.RSAKeys.LAUNCHER == null || Settings.RSAKeys.LAUNCHER_MODULUS == null) {
+                throw new IllegalStateException("Please ensure both launcher and launcher modulus keys are not null");
+            }
+
+            if (Settings.RSAKeys.LAUNCHER_MODULUS.bitLength() != 4096)
+                throw new IllegalArgumentException("Launcher modulus should have a bit length of 4096! Generate new " +
+                        "keys by leaving the fields empty.");
+
+            if (Settings.RSAKeys.LAUNCHER.bitLength() != 4095)
+                throw new IllegalArgumentException("Launcher exponent should have a bit length of 4095! Generate new " +
+                        "keys by leaving the fields empty.");
+
+            System.out.println("Using pre-defined launcher keys [exponent]: BigInteger(" + Settings.RSAKeys.LAUNCHER.toString(16) + ")");
+            System.out.println("Using pre-defined launcher keys [modulus ]: BigInteger(" + Settings.RSAKeys.LAUNCHER_MODULUS.toString(16) + ")");
+        } else {
+            RSAPrivateKeySpec launcher = generateKeySpec(4096);
+            Settings.RSAKeys.LAUNCHER_MODULUS = launcher.getModulus();
+            Settings.RSAKeys.LAUNCHER = launcher.getPrivateExponent();
+
+            System.out.println("public static final BigInteger LAUNCHER_MODULUS = new BigInteger(\"" + launcher.getModulus().toString(16) + "\", 16);");
+            System.out.println("public static final BigInteger LAUNCHER_EXPONENT = new BigInteger(\"" + launcher.getPrivateExponent().toString(16) + "\", 16);\n");
+        }
+
+        // JS5 key
+        if (Settings.RSAKeys.JS5 != null) {
+            if (Settings.RSAKeys.JS5.bitLength() != 4096)
+                throw new IllegalArgumentException("JS5 modulus should have a bit length of 4096! Generate new keys " +
+                        "by leaving the field empty.");
+
+            System.out.println("Using pre-defined JS5 key: BigInteger(" + Settings.RSAKeys.JS5.toString(16) + ")");
+        } else {
+            RSAPrivateKeySpec js5 = generateKeySpec(4096);
+
+            Settings.RSAKeys.JS5 = js5.getModulus();
+            System.out.println("public static final BigInteger JS5_MODULUS = new BigInteger(\"" + js5.getModulus().toString(16) + "\", 16);");
+            System.out.println("public static final BigInteger JS5_EXPONENT = new BigInteger(\"" + js5.getPrivateExponent().toString(16) + "\", 16);\n");
+        }
+
+        // Login key
+        if (Settings.RSAKeys.LOGIN != null) {
+            if (Settings.RSAKeys.LOGIN.bitLength() != 4096)
+                throw new IllegalArgumentException("JS5 modulus should have a bit length of 4096! Generate new keys " +
+                        "by leaving the field empty.");
+
+            System.out.println("Using pre-defined login key: BigInteger(" + Settings.RSAKeys.LOGIN.toString(16) + ")");
+        } else {
+            RSAPrivateKeySpec login = generateKeySpec(1024);
+
+            Settings.RSAKeys.LOGIN = login.getModulus();
+            System.out.println("public static final BigInteger JS5_MODULUS = new BigInteger(\"" + login.getModulus().toString(16) + "\", 16);");
+            System.out.println("public static final BigInteger JS5_EXPONENT = new BigInteger(\"" + login.getPrivateExponent().toString(16) + "\", 16);\n");
+        }
     }
 
     /**

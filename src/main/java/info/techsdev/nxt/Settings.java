@@ -1,5 +1,6 @@
 package info.techsdev.nxt;
 
+import java.math.BigInteger;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
@@ -7,6 +8,33 @@ import java.nio.file.Paths;
  * Simple settings file to configure the rest of the patcher
  */
 public class Settings {
+
+    /**
+     * Holds data about what RSA keys to patch
+     */
+    public static class RSAKeys {
+
+        /**
+         * The JS5 public RSA key to patch the client with. Leave this "null" to generate one automatically
+         */
+        public static BigInteger JS5 = null;
+
+        /**
+         * The login public RSA key to patch the client with. Leave this "null" to generate one automatically
+         */
+        public static BigInteger LOGIN = null;
+
+        /**
+         * The launcher's modulus to use to generate hashes. Leave this "null" to generate one automatically
+         */
+        public static BigInteger LAUNCHER_MODULUS = null;
+
+        /**
+         * The launcher's public key to patch the launcher with. Leave this "null" to generate one automatically
+         */
+        public static BigInteger LAUNCHER = null;
+
+    }
 
     /**
      * The regex in the launcher to see if websites are "legal" or not
