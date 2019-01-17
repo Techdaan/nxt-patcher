@@ -28,6 +28,11 @@ import java.util.zip.CRC32;
  */
 public class Patcher {
 
+    /**
+     * The ASCII charset used to replace RSA keys and text in the binaries
+     */
+    public static final Charset ASCII = Charset.forName("ASCII");
+
     public static void main(String[] args) throws Exception {
         // Validate settings & make sure files exist
         if (Settings.PATCHED_REGEX.length() >= Settings.RUNESCAPE_REGEX.length()) {
@@ -65,67 +70,57 @@ public class Patcher {
         byte[] launcherData = Files.readAllBytes(originalLauncher);
         byte[] clientData = Files.readAllBytes(originalClient);
 
-        byte[] oldLauncherRSA = new byte[1024];
-        byte[] oldJS5RSA = new byte[1024];
-        byte[] oldLoginRSA = new byte[256];
+        byte[] oldLauncherRSA;
+        byte[] oldJS5RSA;
+        byte[] oldLoginRSA;
 
         // Find launcher RSA keys
-        int index = indexOf(launcherData, "10001\0".getBytes(Charset.forName("ASCII")));
-        System.arraycopy(launcherData, index - 1028, oldLauncherRSA, 0, oldLauncherRSA.length);
-
-        try {
-            new BigInteger(new String(oldLauncherRSA, Charset.forName("ASCII")), 16);
-        } catch (NumberFormatException e) {
+        System.out.println("Finding old launcher RSA...");
+        BigInteger oldLauncher = findRSA(launcherData, 1024);
+        if (oldLauncher == null)
             throw new IllegalStateException("Couldn't extract launcher RSA key from binary!");
-        }
+        System.out.println("Found old launcher RSA: new BigInteger(\""+oldLauncher.toString(16)+"\", 16);");
+        oldLauncherRSA = oldLauncher.toString(16).getBytes(ASCII);
 
         // Find client RSA keys
-        index = indexOf(clientData, "10001\0".getBytes(Charset.forName("ASCII")));
-        System.arraycopy(clientData, index + 20, oldJS5RSA, 0, oldJS5RSA.length);
-        System.arraycopy(clientData, index + 20 + oldJS5RSA.length + 16, oldLoginRSA, 0, oldLoginRSA.length);
-
-        try {
-            new BigInteger(new String(oldJS5RSA, Charset.forName("ASCII")), 16);
-        } catch (NumberFormatException e) {
+        System.out.println("Finding old js5 RSA...");
+        BigInteger oldJS5 = findRSA(clientData, 1024);
+        if (oldJS5 == null)
             throw new IllegalStateException("Couldn't extract JS5 RSA key from binary!");
-        }
+        oldJS5RSA = oldJS5.toString(16).getBytes(ASCII);
+        System.out.println("Found old js5 RSA: new BigInteger(\""+oldJS5.toString(16)+"\", 16);");
 
-
-        try {
-            new BigInteger(new String(oldLoginRSA, Charset.forName("ASCII")), 16);
-        } catch (NumberFormatException e) {
+        System.out.println("Finding old login RSA...");
+        BigInteger oldLogin = findRSA(clientData, 256);
+        if(oldLogin == null)
             throw new IllegalStateException("Couldn't extract login RSA key from binary!");
-        }
+        oldLoginRSA = oldLogin.toString(16).getBytes(ASCII);
+        System.out.println("Found old login RSA: new BigInteger(\""+oldLogin.toString(16)+"\", 16);");
 
         // Load RSA keys
         loadOrGenerateKeys();
 
         // Patch RSA keys
-
-
         if (!patch(launcherData, oldLauncherRSA,
-                Settings.RSAKeys.LAUNCHER_MODULUS.toString(16).getBytes(Charset.forName("ASCII")))) {
-            throw new NullPointerException("Couldn't patch launcher RSA key - Did the offset change? Attempting to " +
-                    "replace RSA key: " + new String(oldLauncherRSA, Charset.forName("ASCII")));
+                Settings.RSAKeys.LAUNCHER_MODULUS.toString(16).getBytes(ASCII))) {
+            throw new NullPointerException("Couldn't patch launcher RSA key");
         }
         if (!patch(clientData, oldJS5RSA,
-                Settings.RSAKeys.JS5.toString(16).getBytes(Charset.forName("ASCII")))) {
-            throw new NullPointerException("Couldn't patch launcher RSA key - does the key in the Settings class " +
-                    "match the one in the launcher?");
+                Settings.RSAKeys.JS5.toString(16).getBytes(ASCII))) {
+            throw new NullPointerException("Couldn't patch client js5 RSA key");
         }
         if (!patch(clientData, oldLoginRSA,
-                Settings.RSAKeys.LOGIN.toString(16).getBytes(Charset.forName("ASCII")))) {
-            throw new NullPointerException("Couldn't patch launcher RSA key - does the key in the Settings class " +
-                    "match the one in the launcher?");
+                Settings.RSAKeys.LOGIN.toString(16).getBytes(ASCII))) {
+            throw new NullPointerException("Couldn't patch client login RSA key");
         }
 
         // Patch regex and default config uri
-        if (!patch(launcherData, Settings.RUNESCAPE_REGEX.getBytes(Charset.forName("ASCII")),
-                Settings.PATCHED_REGEX.getBytes(Charset.forName("ASCII")))) {
+        if (!patch(launcherData, Settings.RUNESCAPE_REGEX.getBytes(ASCII),
+                Settings.PATCHED_REGEX.getBytes(ASCII))) {
             throw new NullPointerException("Couldn't patch launcher regex - did you change the RuneScape regex?");
         }
-        if (!patch(launcherData, Settings.RUNESCAPE_CONFIG_URI.getBytes(Charset.forName("ASCII")),
-                Settings.PATCHED_CONFIG_URI.getBytes(Charset.forName("ASCII")))) {
+        if (!patch(launcherData, Settings.RUNESCAPE_CONFIG_URI.getBytes(ASCII),
+                Settings.PATCHED_CONFIG_URI.getBytes(ASCII))) {
             throw new NullPointerException("Couldn't patch launcher config uri - did you change the RuneScape uri?");
         }
 
@@ -137,7 +132,7 @@ public class Patcher {
         byte[] compressedClient = RSLZMAOutputStream.compress(clientData);
         Files.write(Settings.BASE_PATH.resolve("client_compressed.exe"), compressedClient);
 
-        System.out.println("Client CRC: " + CRC(clientData));
+        System.out.println("\nClient CRC: " + CRC(clientData));
         System.out.println("Client hash: " + hash(clientData, Settings.RSAKeys.LAUNCHER_MODULUS,
                 Settings.RSAKeys.LAUNCHER));
 
@@ -168,12 +163,12 @@ public class Patcher {
                         "keys by leaving the fields empty.");
 
             // Not sure about the bit length, should probably read up on it
-            if (Settings.RSAKeys.LAUNCHER.bitLength() >= 4090 && Settings.RSAKeys.LAUNCHER.bitLength() <= 4100)
+            if (Settings.RSAKeys.LAUNCHER.bitLength() <= 4090 && Settings.RSAKeys.LAUNCHER.bitLength() >= 4100)
                 throw new IllegalArgumentException("Launcher exponent has an invalid bit length! Generate new " +
                         "keys by leaving the fields empty.");
 
-            System.out.println("Using pre-defined launcher keys [exponent]: BigInteger(" + Settings.RSAKeys.LAUNCHER.toString(16) + ")");
-            System.out.println("Using pre-defined launcher keys [modulus ]: BigInteger(" + Settings.RSAKeys.LAUNCHER_MODULUS.toString(16) + ")");
+            System.out.println("Using pre-defined launcher keys [exponent]: BigInteger(\"" + Settings.RSAKeys.LAUNCHER.toString(16) + "\", 16)");
+            System.out.println("Using pre-defined launcher keys [modulus ]: BigInteger(\"" + Settings.RSAKeys.LAUNCHER_MODULUS.toString(16) + "\", 16)");
         } else {
             RSAPrivateKeySpec launcher = generateKeySpec(4096);
             Settings.RSAKeys.LAUNCHER_MODULUS = launcher.getModulus();
@@ -189,7 +184,7 @@ public class Patcher {
                 throw new IllegalArgumentException("JS5 modulus should have a bit length of 4096! Generate new keys " +
                         "by leaving the field empty.");
 
-            System.out.println("Using pre-defined JS5 key: BigInteger(" + Settings.RSAKeys.JS5.toString(16) + ")");
+            System.out.println("Using pre-defined JS5 key: BigInteger(" + Settings.RSAKeys.JS5.toString(16) + ")\n");
         } else {
             RSAPrivateKeySpec js5 = generateKeySpec(4096);
 
@@ -201,17 +196,45 @@ public class Patcher {
         // Login key
         if (Settings.RSAKeys.LOGIN != null) {
             if (Settings.RSAKeys.LOGIN.bitLength() != 1024)
-                throw new IllegalArgumentException("Login modulus should have a bit length of 4096! Generate new keys " +
+                throw new IllegalArgumentException("Login modulus should have a bit length of 4096! Generate new keys" +
+                        " " +
                         "by leaving the field empty.");
 
-            System.out.println("Using pre-defined login key: BigInteger(" + Settings.RSAKeys.LOGIN.toString(16) + ")");
+            System.out.println("Using pre-defined login key: BigInteger(" + Settings.RSAKeys.LOGIN.toString(16) + ")\n");
         } else {
             RSAPrivateKeySpec login = generateKeySpec(1024);
 
             Settings.RSAKeys.LOGIN = login.getModulus();
             System.out.println("public static final BigInteger LOGIN_MODULUS = new BigInteger(\"" + login.getModulus().toString(16) + "\", 16);");
-            System.out.println("public static final BigInteger LOGIN_EXPONENT = new BigInteger(\"" + login.getPrivateExponent().toString(16) + "\", 16);\n");
+            System.out.println("public static final BigInteger LOGIN_EXPONENT = new BigInteger(\"" + login.getPrivateExponent().toString(16) + "\", 16);");
         }
+    }
+
+    /**
+     * Finds a RSA key in the binary based on the bit length of the key
+     *
+     * @param data The data to find the RSA key in
+     * @param bits The bit length of the RSA key
+     * @return The RSA key if the RSA key would be found, this returns null if no RSA key could be found
+     */
+    private static BigInteger findRSA(byte[] data, int bits) {
+        byte[] buffer = new byte[bits];
+
+        for (int i = 1; i < data.length - buffer.length - 1; i++) {
+            if(data[i] == 0) continue;
+            if(data[i-1] != 0) continue;
+            if(data[i + bits + 1] != 0) continue; // Ensure the key is followed by a string terminator
+
+            System.arraycopy(data, i, buffer, 0, bits);
+
+            try {
+                // If it is not a valid BigInteger the instantiaton will throw an error
+                return new BigInteger(new String(buffer, ASCII), 16);
+            } catch (NumberFormatException ignore) {
+            }
+        }
+
+        return null;
     }
 
     /**
