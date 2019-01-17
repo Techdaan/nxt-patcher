@@ -76,7 +76,7 @@ public class Patcher {
 
         // Find launcher RSA keys
         System.out.println("Finding old launcher RSA...");
-        BigInteger oldLauncher = findRSA(launcherData, 1024);
+        BigInteger oldLauncher = findRSA(launcherData, 4096);
         if (oldLauncher == null)
             throw new IllegalStateException("Couldn't extract launcher RSA key from binary!");
         System.out.println("Found old launcher RSA: new BigInteger(\""+oldLauncher.toString(16)+"\", 16);");
@@ -84,14 +84,14 @@ public class Patcher {
 
         // Find client RSA keys
         System.out.println("Finding old js5 RSA...");
-        BigInteger oldJS5 = findRSA(clientData, 1024);
+        BigInteger oldJS5 = findRSA(clientData, 4096);
         if (oldJS5 == null)
             throw new IllegalStateException("Couldn't extract JS5 RSA key from binary!");
         oldJS5RSA = oldJS5.toString(16).getBytes(ASCII);
         System.out.println("Found old js5 RSA: new BigInteger(\""+oldJS5.toString(16)+"\", 16);");
 
         System.out.println("Finding old login RSA...");
-        BigInteger oldLogin = findRSA(clientData, 256);
+        BigInteger oldLogin = findRSA(clientData, 1024);
         if(oldLogin == null)
             throw new IllegalStateException("Couldn't extract login RSA key from binary!");
         oldLoginRSA = oldLogin.toString(16).getBytes(ASCII);
@@ -218,14 +218,15 @@ public class Patcher {
      * @return The RSA key if the RSA key would be found, this returns null if no RSA key could be found
      */
     private static BigInteger findRSA(byte[] data, int bits) {
-        byte[] buffer = new byte[bits];
+        int bytes = bits / 4; // Amount of bytes in which the RSA key is written in
+        byte[] buffer = new byte[bytes];
 
         for (int i = 1; i < data.length - buffer.length - 1; i++) {
             if(data[i] == 0) continue;
             if(data[i-1] != 0) continue;
-            if(data[i + bits + 1] != 0) continue; // Ensure the key is followed by a string terminator
+            if(data[i + bytes + 1] != 0) continue; // Ensure the key is followed by a string terminator
 
-            System.arraycopy(data, i, buffer, 0, bits);
+            System.arraycopy(data, i, buffer, 0, bytes);
 
             try {
                 // If it is not a valid BigInteger the instantiaton will throw an error
