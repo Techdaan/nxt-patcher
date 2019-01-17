@@ -209,8 +209,8 @@ public class Patcher {
             RSAPrivateKeySpec login = generateKeySpec(1024);
 
             Settings.RSAKeys.LOGIN = login.getModulus();
-            System.out.println("public static final BigInteger JS5_MODULUS = new BigInteger(\"" + login.getModulus().toString(16) + "\", 16);");
-            System.out.println("public static final BigInteger JS5_EXPONENT = new BigInteger(\"" + login.getPrivateExponent().toString(16) + "\", 16);\n");
+            System.out.println("public static final BigInteger LOGIN_MODULUS = new BigInteger(\"" + login.getModulus().toString(16) + "\", 16);");
+            System.out.println("public static final BigInteger LOGIN_EXPONENT = new BigInteger(\"" + login.getPrivateExponent().toString(16) + "\", 16);\n");
         }
     }
 
